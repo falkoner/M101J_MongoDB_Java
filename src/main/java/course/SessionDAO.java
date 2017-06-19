@@ -29,6 +29,7 @@ public class SessionDAO {
     private final MongoCollection<Document> sessionsCollection;
 
     public SessionDAO(final MongoDatabase blogDatabase) {
+
         sessionsCollection = blogDatabase.getCollection("sessions");
     }
 
@@ -58,7 +59,7 @@ public class SessionDAO {
 
         // build the BSON object
         Document session = new Document("username", username)
-                           .append("_id", sessionID);
+                .append("_id", sessionID);
 
         sessionsCollection.insertOne(session);
 
