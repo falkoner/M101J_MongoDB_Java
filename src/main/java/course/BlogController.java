@@ -1,23 +1,23 @@
 /*
- * Copyright 2015 MongoDB, Inc.
+ * Copyright 2012-2016 MongDB, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
 
 package course;
 
-import com.mongodb.DB;
-import com.mongodb.DBObject;
+
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
 import com.mongodb.client.MongoDatabase;
@@ -39,9 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import static spark.Spark.get;
-import static spark.Spark.post;
-import static spark.Spark.setPort;
+import static spark.Spark.*;
 
 /**
  * This class encapsulates the controllers for the blog web application.  It delegates all interaction with MongoDB
@@ -103,7 +101,7 @@ public class BlogController {
         }
 
         protected abstract void doHandle(final Request request, final Response response, final Writer writer)
-        throws IOException, TemplateException;
+                throws IOException, TemplateException;
 
     }
 
@@ -148,7 +146,7 @@ public class BlogController {
                     SimpleHash root = new SimpleHash();
 
                     root.put("post", post);
-                    root.put("comments", newComment);
+                    root.put("comment", newComment);
 
                     template.process(root, writer);
                 }
@@ -195,7 +193,7 @@ public class BlogController {
         get(new FreemarkerBasedRoute("/signup", "signup.ftl") {
             @Override
             protected void doHandle(Request request, Response response, Writer writer)
-            throws IOException, TemplateException {
+                    throws IOException, TemplateException {
 
                 SimpleHash root = new SimpleHash();
 
@@ -211,29 +209,6 @@ public class BlogController {
                 template.process(root, writer);
             }
         });
-
-        get(new FreemarkerBasedRoute("/welcome", "welcome.ftl") {
-            @Override
-            protected void doHandle(Request request, Response response, Writer writer) throws IOException, TemplateException {
-
-                String cookie = getSessionCookie(request);
-                String username = sessionDAO.findUserNameBySessionId(cookie);
-
-                if (username == null) {
-                    System.out.println("welcome() can't identify the user, redirecting to signup");
-                    response.redirect("/signup");
-
-                }
-                else {
-                    SimpleHash root = new SimpleHash();
-
-                    root.put("username", username);
-
-                    template.process(root, writer);
-                }
-            }
-        });
-
 
         // will present the form used to process new blog posts
         get(new FreemarkerBasedRoute("/newpost", "newpost_template.ftl") {
@@ -259,7 +234,7 @@ public class BlogController {
         post(new FreemarkerBasedRoute("/newpost", "newpost_template.ftl") {
             @Override
             protected void doHandle(Request request, Response response, Writer writer)
-            throws IOException, TemplateException {
+                    throws IOException, TemplateException {
 
                 String title = StringEscapeUtils.escapeHtml4(request.queryParams("subject"));
                 String post = StringEscapeUtils.escapeHtml4(request.queryParams("body"));
@@ -321,7 +296,7 @@ public class BlogController {
         post(new FreemarkerBasedRoute("/newcomment", "entry_template.ftl") {
             @Override
             protected void doHandle(Request request, Response response, Writer writer)
-            throws IOException, TemplateException {
+                    throws IOException, TemplateException {
                 String name = StringEscapeUtils.escapeHtml4(request.queryParams("commentName"));
                 String email = StringEscapeUtils.escapeHtml4(request.queryParams("commentEmail"));
                 String body = StringEscapeUtils.escapeHtml4(request.queryParams("commentBody"));
@@ -340,7 +315,7 @@ public class BlogController {
                     comment.put("name", name);
                     comment.put("email", email);
                     comment.put("body", body);
-                    root.put("comments", comment);
+                    root.put("comment", comment);
                     root.put("post", post);
                     root.put("errors", "Post must contain your name and an actual comment");
 
@@ -385,15 +360,13 @@ public class BlogController {
 
                     if (sessionID == null) {
                         response.redirect("/internal_error");
-                    }
-                    else {
+                    } else {
                         // set the cookie for the user's browser
                         response.raw().addCookie(new Cookie("session", sessionID));
 
                         response.redirect("/welcome");
                     }
-                }
-                else {
+                } else {
                     SimpleHash root = new SimpleHash();
 
 
@@ -402,6 +375,27 @@ public class BlogController {
                     root.put("login_error", "Invalid Login");
                     template.process(root, writer);
                 }
+            }
+        });
+
+        // Show the posts filed under a certain tag
+        get(new FreemarkerBasedRoute("/tag/:thetag", "blog_template.ftl") {
+            @Override
+            protected void doHandle(Request request, Response response, Writer writer)
+                    throws IOException, TemplateException {
+
+                String username = sessionDAO.findUserNameBySessionId(getSessionCookie(request));
+                SimpleHash root = new SimpleHash();
+
+                String tag = StringEscapeUtils.escapeHtml4(request.params(":thetag"));
+                List<Document> posts = blogPostDAO.findByTagDateDescending(tag);
+
+                root.put("myposts", posts);
+                if (username != null) {
+                    root.put("username", username);
+                }
+
+                template.process(root, writer);
             }
         });
 
