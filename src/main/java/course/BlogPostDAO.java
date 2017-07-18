@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2016 MongDB, Inc.
+ * Copyright 2013-2015 MongoDB Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,14 @@ package course;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
 import org.bson.Document;
 
 import java.util.ArrayList;
-import java.util.GregorianCalendar;
+import java.util.Date;
 import java.util.List;
+
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Sorts.descending;
 
 public class BlogPostDAO {
     private final MongoCollection<Document> postsCollection;
@@ -36,53 +36,47 @@ public class BlogPostDAO {
     }
 
     public Document findByPermalink(String permalink) {
-        Document post = postsCollection.find(Filters.eq("permalink", permalink)).first();
+        Document post = postsCollection.find(eq("permalink", permalink)).first();
 
-
+        // fix up if a post has no likes
+        if (post != null) {
+            List<Document> comments = (List<Document>) post.get("comments");
+            for (Document comment : comments) {
+                if (!comment.containsKey("num_likes")) {
+                    comment.put("num_likes", 0);
+                }
+            }
+        }
         return post;
     }
 
     public List<Document> findByDateDescending(int limit) {
-        return postsCollection.find()
-                .sort(Sorts.descending("date"))
+        return postsCollection.find().sort(descending("date"))
                 .limit(limit)
                 .into(new ArrayList<Document>());
     }
 
     public List<Document> findByTagDateDescending(final String tag) {
-        return postsCollection.find(Filters.eq("tags", tag))
-                .sort(Sorts.descending("date"))
+        return postsCollection.find(eq("tags", tag))
+                .sort(descending("date"))
                 .limit(10)
                 .into(new ArrayList<Document>());
     }
 
     public String addPost(String title, String body, List tags, String username) {
-
-        System.out.println("inserting blog entry " + title + " " + body);
-
         String permalink = title.replaceAll("\\s", "_"); // whitespace becomes _
         permalink = permalink.replaceAll("\\W", ""); // get rid of non alphanumeric
         permalink = permalink.toLowerCase();
 
-        String permLinkExtra = String.valueOf(GregorianCalendar
-                .getInstance().getTimeInMillis());
-        permalink += permLinkExtra;
+        Document post = new Document("title", title)
+                .append("author", username)
+                .append("body", body)
+                .append("permalink", permalink)
+                .append("tags", tags)
+                .append("comments", new ArrayList())
+                .append("date", new Date());
 
-        Document post = new Document("title", title);
-        post.append("author", username);
-        post.append("body", body);
-        post.append("permalink", permalink);
-        post.append("tags", tags);
-        post.append("comments", new java.util.ArrayList());
-        post.append("date", new java.util.Date());
-
-        try {
-            postsCollection.insertOne(post);
-            System.out.println("Inserting blog post with permalink " + permalink);
-        } catch (Exception e) {
-            System.out.println("Error inserting post");
-            return null;
-        }
+        postsCollection.insertOne(post);
 
         return permalink;
     }
@@ -90,12 +84,24 @@ public class BlogPostDAO {
     public void addPostComment(final String name, final String email, final String body, final String permalink) {
         Document comment = new Document("author", name)
                 .append("body", body);
-        if (email != null && !email.equals("")) {
+
+        if (email != null && !email.isEmpty()) {
             comment.append("email", email);
         }
 
-        postsCollection.updateOne(Filters.eq("permalink", permalink),
-                Updates.push("comments", comment));
+        postsCollection.updateOne(eq("permalink", permalink),
+                new Document("$push", new Document("comments", comment)));
     }
 
+    public void likePost(final String permalink, final int ordinal) {
+        //
+        //
+        // TODO Final Question 4 - work here
+        // You must increment the number of likes on the comment in position `ordinal`
+        // on the post identified by `permalink`.
+        //
+        //
+        postsCollection.updateOne(eq("permalink", permalink),
+                new Document("$inc", new Document("comments." + ordinal + ".num_likes", 1)));
+    }
 }

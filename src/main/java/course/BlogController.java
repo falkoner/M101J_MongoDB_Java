@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2016 MongDB, Inc.
+ * Copyright 2013-2015 MongoDB Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -399,6 +399,33 @@ public class BlogController {
             }
         });
 
+        // will allow a user to click Like on a post
+        post(new FreemarkerBasedRoute("/like", "entry_template.ftl") {
+            @Override
+            protected void doHandle(Request request, Response response, Writer writer) throws IOException, TemplateException {
+
+                String permalink = request.queryParams("permalink");
+                String commentOrdinalStr = request.queryParams("comment_ordinal");
+
+
+                // look up the post in question
+
+                int ordinal = Integer.parseInt(commentOrdinalStr);
+
+                // TODO: check return or have checkSession throw
+                String username = sessionDAO.findUserNameBySessionId(getSessionCookie(request));
+                Document post = blogPostDAO.findByPermalink(permalink);
+
+                //  if post not found, redirect to post not found error
+                if (post == null) {
+                    response.redirect("/post_not_found");
+                } else {
+                    blogPostDAO.likePost(permalink, ordinal);
+
+                    response.redirect("/post/" + permalink);
+                }
+            }
+        });
 
         // tells the user that the URL is dead
         get(new FreemarkerBasedRoute("/post_not_found", "post_not_found.ftl") {
@@ -476,10 +503,6 @@ public class BlogController {
 
     // tags the tags string and put it into an array
     private ArrayList<String> extractTags(String tags) {
-
-        // probably more efficent ways to do this.
-        //
-        // whitespace = re.compile('\s')
 
         tags = tags.replaceAll("\\s", "");
         String tagArray[] = tags.split(",");
